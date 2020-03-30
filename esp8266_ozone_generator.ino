@@ -123,16 +123,53 @@ Execution<br>
 )rawliteral";
 
 const char bodyCalibrate[] PROGMEM = R"rawliteral(
-<html>
+<!DOCTYPE HTML><html>
 <head>
-<title>Ozone generator</title>
-<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<style>
+	html {
+		font-family: Arial;
+		display: inline-block;
+		margin: 0px auto;
+		text-align: center;
+	}
+	h2 { font-size: 3.0rem; }
+	p { font-size: 1.5rem; }
+	.units { font-size: 1.2rem; }
+	.dht-labels{
+		font-size: 1.5rem;
+		vertical-align:middle;
+		padding-bottom: 15px;
+	}
+	input[type=button], input[type=submit], input[type=reset] {
+		background-color: #808080;
+		font-size: 1.5rem;
+		border: none;
+		padding: 16px 32px;
+		text-decoration: none;
+		margin: 4px 2px;
+		cursor: pointer;
+	}
+	input[type=text] {
+		font-size: 1.5rem;
+		border: none;
+		text-align: center;
+		border-bottom: 2px solid grey;
+	}
+	</style>
 </head>
 <body>
-<form action="/">
-Calibration<br>
-<input type="submit" name="cancel" value="Cancel">
-</form>
+	<h2>Ozone generator calibration</h2>
+	<form action="/">
+	<p>
+	<span class="dht-labels">Resistence</span>
+	<span id="resistence">%RESISTENCE%</span>
+	<sup class="units">Ohms</sup>
+	</p>
+	<p>
+	<input type="submit" name="cancel" value="Cancel">
+	</p>
+	</form>
 </body>
 </html>
 )rawliteral";
@@ -179,8 +216,14 @@ sendBodyExecute( AsyncWebServerRequest* request )
 void
 sendBodyCalibrate( AsyncWebServerRequest* request )
 {
-    request->send_P( 200, "text/html", bodyCalibrate,
-                     []( const String& var ) { return String( ); } );
+    request->send_P( 200, "text/html", bodyCalibrate, []( const String& var ) {
+        if ( var == "RESISTENCE" )
+        {
+            return String( mq131.get_r_sensor( ) );
+        }
+
+        return String( );
+    } );
 }
 
 void
@@ -198,6 +241,7 @@ handleRoot( AsyncWebServerRequest* request )
         else if ( request->hasArg( "calibrate" ) )
         {
             sendBodyCalibrate( request );
+            mq131.start_calibration( );
             mode = modeCalibrate;
         }
         else
@@ -226,6 +270,7 @@ handleRoot( AsyncWebServerRequest* request )
         {
             sendBodyMain( request );
             mode = modeMain;
+            mq131.cancel_calibration( );
         }
         else
         {
@@ -282,11 +327,30 @@ measureDHT11( )
 }
 
 void
+handleCalibration( )
+{
+    if ( mq131.is_calibration_finished( ) )
+    {
+        mq131.apply_calibration_data( );
+        mode = modeMain;
+    }
+    else
+    {
+        mq131.calibration_step( );
+    }
+}
+
+void
 handleSecond( )
 {
     measureDHT11( );
 
     mq131.sample( );
+
+    if ( mode == modeCalibrate )
+    {
+        handleCalibration( );
+    }
 }
 
 void

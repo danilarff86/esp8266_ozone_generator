@@ -52,7 +52,11 @@ struct MQ131Sensor
         r0_sensor_ = r0_sensor;
     }
 
-    void calibrate( );
+    void start_calibration( );
+    void cancel_calibration( );
+    void calibration_step( );
+    void apply_calibration_data( );
+    bool is_calibration_finished( ) const;
 
 private:
     inline static const Env&
@@ -69,6 +73,17 @@ private:
     const float c1_;
     float r0_sensor_;
     uint16_t adc_data_;
+
+    struct CalibrationData
+    {
+        static const uint8_t array_len = 20;
+        uint32_t rsensor_data[ array_len ]{};
+        uint8_t index;
+        uint32_t all_sum;
+        float previous_average;
+        bool array_infilled;
+        float r0_sensor_;
+    } calibration_data_;
 
     static const Env default_env;
 };

@@ -63,6 +63,7 @@ MQ131Sensor::MQ131Sensor( int pin_sensor,
     , c1_( float( power_voltage * 1024 ) / float( adc_voltage ) * float( r_load_ ) )
     , r0_sensor_( MQ131_DEFAULT_R0_SENSOR )
     , adc_data_( 0 )
+    , calibration_data_( )
 {
     pinMode( pin_sensor_, INPUT );
 }
@@ -121,50 +122,73 @@ MQ131Sensor::get_env_correction_ratio( const Env& env )
 }
 
 void
-MQ131Sensor::calibrate( )
+MQ131Sensor::start_calibration( )
 {
-    const uint8_t array_len = 20;
-    uint32_t rsensor_data[ array_len ]{};
-    uint8_t index = 0;
-    uint32_t all_sum = 0;
-    float previous_average = 0.0f;
-    r0_sensor_ = -1.0f;
-    uint8_t array_infilled = 0;
-
-    while ( r0_sensor_ < 0.0f )
+    calibration_data_.all_sum = 0;
+    calibration_data_.array_infilled = false;
+    calibration_data_.index = 0;
+    calibration_data_.previous_average = 0.0f;
+    calibration_data_.r0_sensor_ = -1.0f;
+    for ( auto& elem : calibration_data_.rsensor_data )
     {
-        all_sum -= rsensor_data[ index ];
-        sample( );
-        rsensor_data[ index ] = get_r_sensor( );
-        all_sum += rsensor_data[ index ];
-        if ( ++index == array_len )
-        {
-            index = 0;
-            array_infilled = 1;
-        }
-
-        if ( array_infilled )
-        {
-            const float actual_average = float( all_sum ) / float( array_len );
-
-            const float diff
-                = ( actual_average > previous_average ? actual_average - previous_average
-                                                      : previous_average - actual_average )
-                  * 100 / actual_average;
-
-            Serial.print( "Average: " );
-            Serial.print( actual_average );
-            Serial.print( ", Percentage diff: " );
-            Serial.println( diff );
-
-            if ( diff <= 0.0f )
-            {
-                r0_sensor_ = actual_average;
-            }
-
-            previous_average = actual_average;
-        }
-
-        delay( 1000 );
+        elem = 0;
     }
+    Serial.println( "Calibration started" );
+}
+
+void
+MQ131Sensor::calibration_step( )
+{
+    Serial.println( "Calibration step" );
+    calibration_data_.all_sum -= calibration_data_.rsensor_data[ calibration_data_.index ];
+    calibration_data_.rsensor_data[ calibration_data_.index ] = get_r_sensor( );
+    calibration_data_.all_sum += calibration_data_.rsensor_data[ calibration_data_.index ];
+    if ( ++calibration_data_.index == calibration_data_.array_len )
+    {
+        calibration_data_.index = 0;
+        calibration_data_.array_infilled = 1;
+    }
+
+    if ( calibration_data_.array_infilled )
+    {
+        const float actual_average
+            = float( calibration_data_.all_sum ) / float( calibration_data_.array_len );
+
+        const float diff = ( actual_average > calibration_data_.previous_average
+                                 ? actual_average - calibration_data_.previous_average
+                                 : calibration_data_.previous_average - actual_average )
+                           * 100 / actual_average;
+
+        Serial.print( "Average: " );
+        Serial.print( actual_average );
+        Serial.print( ", Percentage diff: " );
+        Serial.println( diff );
+
+        if ( diff <= 0.0f )
+        {
+            calibration_data_.r0_sensor_ = actual_average;
+        }
+
+        calibration_data_.previous_average = actual_average;
+    }
+}
+
+void
+MQ131Sensor::apply_calibration_data( )
+{
+    Serial.println( "Calibration data applied" );
+    r0_sensor_ = calibration_data_.r0_sensor_;
+}
+
+void
+MQ131Sensor::cancel_calibration( )
+{
+    Serial.println( "Calibration cancelled" );
+    calibration_data_.r0_sensor_ = -1.0f;
+}
+
+bool
+MQ131Sensor::is_calibration_finished( ) const
+{
+    return calibration_data_.r0_sensor_ >= 0.0f;
 }
