@@ -67,7 +67,7 @@ const char bodyMain[] PROGMEM = R"rawliteral(
 </head>
 <body>
 	<h2>Ozone generator</h2>
-	<form action="/">
+	<form action="/" method="post">
 	<p>
 	<span class="dht-labels">Temperature</span> 
 	<span id="temperature">%TEMPERATURE%</span>
@@ -114,7 +114,7 @@ const char bodyExecute[] PROGMEM = R"rawliteral(
 <meta charset="UTF-8">
 </head>
 <body>
-<form action="/">
+<form action="/" method="post">
 Execution<br>
 <input type="submit" name="cancel" value="Cancel">
 </form>
@@ -160,7 +160,7 @@ const char bodyCalibrate[] PROGMEM = R"rawliteral(
 </head>
 <body>
 	<h2>Ozone generator calibration</h2>
-	<form action="/">
+	<form action="/" method="post">
 	<p>
 	<span class="dht-labels">Resistence</span>
 	<span id="resistence">%RESISTENCE%</span>
@@ -233,49 +233,49 @@ handleRoot( AsyncWebServerRequest* request )
     {
     case modeMain:
     {
-        if ( request->hasArg( "execute" ) )
+        if ( request->method( ) == HTTP_POST )
         {
-            sendBodyExecute( request );
-            mode = modeExecute;
-        }
-        else if ( request->hasArg( "calibrate" ) )
-        {
-            sendBodyCalibrate( request );
-            mq131.start_calibration( );
-            mode = modeCalibrate;
-        }
-        else
-        {
-            sendBodyMain( request );
+            if ( request->hasParam( "execute", true ) )
+            {
+                sendBodyExecute( request );
+                mode = modeExecute;
+                break;
+            }
+            else if ( request->hasParam( "calibrate", true ) )
+            {
+                sendBodyCalibrate( request );
+                mq131.start_calibration( );
+                mode = modeCalibrate;
+                break;
+            }
         }
 
+        sendBodyMain( request );
         break;
     }
     case modeExecute:
     {
-        if ( request->hasArg( "cancel" ) )
+        if ( request->method( ) == HTTP_POST && request->hasParam( "cancel", true ) )
         {
             sendBodyMain( request );
             mode = modeMain;
+            break;
         }
-        else
-        {
-            sendBodyExecute( request );
-        }
+
+        sendBodyExecute( request );
         break;
     }
     case modeCalibrate:
     {
-        if ( request->hasArg( "cancel" ) )
+        if ( request->method( ) == HTTP_POST && request->hasParam( "cancel", true ) )
         {
             sendBodyMain( request );
             mode = modeMain;
             mq131.cancel_calibration( );
+            break;
         }
-        else
-        {
-            sendBodyCalibrate( request );
-        }
+
+        sendBodyCalibrate( request );
         break;
     }
     default:
@@ -297,6 +297,7 @@ setup( )
     Serial.println( myIP );
 
     server.on( "/", HTTP_GET, handleRoot );
+    server.on( "/", HTTP_POST, handleRoot );
 
     server.begin( );
     Serial.println( "HTTP server started" );
