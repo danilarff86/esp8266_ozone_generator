@@ -1,55 +1,17 @@
-/*
-   Copyright (c) 2015, Majenko Technologies
-   All rights reserved.
-
-   Redistribution and use in source and binary forms, with or without modification,
-   are permitted provided that the following conditions are met:
-
- * * Redistributions of source code must retain the above copyright notice, this
-     list of conditions and the following disclaimer.
-
- * * Redistributions in binary form must reproduce the above copyright notice, this
-     list of conditions and the following disclaimer in the documentation and/or
-     other materials provided with the distribution.
-
- * * Neither the name of Majenko Technologies nor the names of its
-     contributors may be used to endorse or promote products derived from
-     this software without specific prior written permission.
-
-   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-   ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-   WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-   DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
-   ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-   (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-   LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
-   ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-   SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
-
-/* Create a WiFi access point and provide a web server on it. */
-
+#include <Adafruit_Sensor.h>
+#include <Arduino.h>
 #include <DHT.h>
-#include <ESP8266WebServer.h>
 #include <ESP8266WiFi.h>
-#include <WiFiClient.h>
+#include <ESPAsyncTCP.h>
+#include <ESPAsyncWebServer.h>
+#include <Hash.h>
 
-#ifndef APSSID
-#define APSSID "OzoneGenerator"
-#define APPSK "80672807408"
-#endif
+const char* ssid = "OzoneGenerator";
+const char* password = "80672807408";
 
-#define DHTPIN D4
-#define DHTTYPE DHT11
+DHT dht( D4, DHT11 );
 
-DHT dht( DHTPIN, DHTTYPE );
-
-/* Set these to your desired credentials. */
-const char* ssid = APSSID;
-const char* password = APPSK;
-
-ESP8266WebServer server( 80 );
+AsyncWebServer server( 80 );
 
 enum Mode
 {
@@ -67,27 +29,85 @@ float r0 = 11000.1f;
 float ozoneMgM3 = 13.5f;
 int executionTime = 30;
 
-const char* bodyMain = R"(
-<html>
+const char bodyMain[] PROGMEM = R"rawliteral(
+<!DOCTYPE HTML><html>
 <head>
-<title>Ozone generator</title>
-<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<style>
+	html {
+		font-family: Arial;
+		display: inline-block;
+		margin: 0px auto;
+		text-align: center;
+	}
+	h2 { font-size: 3.0rem; }
+	p { font-size: 1.5rem; }
+	.units { font-size: 1.2rem; }
+	.dht-labels{
+		font-size: 1.5rem;
+		vertical-align:middle;
+		padding-bottom: 15px;
+	}
+	input[type=button], input[type=submit], input[type=reset] {
+		background-color: #808080;
+		font-size: 1.5rem;
+		border: none;
+		padding: 16px 32px;
+		text-decoration: none;
+		margin: 4px 2px;
+		cursor: pointer;
+	}
+	input[type=text] {
+		font-size: 1.5rem;
+		border: none;
+		text-align: center;
+		border-bottom: 2px solid grey;
+	}
+	</style>
 </head>
 <body>
-<form action="/">
-Temperature = %.2f °C<br>
-Humidity = %.2f %%<br>
-Resistence = %.2f Ohms<br>
-Concentration = %.2f mg/m3<br>
-Base resistence:<input type="text" size="10" name="r0" value="%.2f"> Ohms<br>
-Execution time:<input type="text" size="10" name="t" value="%d"> minutes<br>
-<input type="submit" name="execute" value="Execute"><input type="submit" name="calibrate" value="Calibrate">
-</form>
+	<h2>Ozone generator</h2>
+	<form action="/">
+	<p>
+	<span class="dht-labels">Temperature</span> 
+	<span id="temperature">%TEMPERATURE%</span>
+	<sup class="units">&deg;C</sup>
+	</p>
+	<p>
+	<span class="dht-labels">Humidity</span>
+	<span id="humidity">%HUMIDITY%</span>
+	<sup class="units">&#37;</sup>
+	</p>
+	<p>
+	<span class="dht-labels">Concentration</span>
+	<span id="concentration">%CONCENTRATION%</span>
+	<sup class="units">mg/m3</sup>
+	</p>
+	<p>
+	<span class="dht-labels">Resistence</span>
+	<span id="resistence">%RESISTENCE%</span>
+	<sup class="units">Ohms</sup>
+	</p>
+	<p>
+	<span class="dht-labels">Base resistence</span>
+	<input type="text" name="r0" size="7" value="%BASE_RESISTENCE%">
+	<sup class="units">Ohms</sup>
+	</p>
+	<p>
+	<span class="dht-labels">Execution time</span>
+	<input type="text" name="t_exec" size="3" value="%EXECUTION_TIME%">
+	<sup class="units">minutes</sup>
+	</p>
+	<p>
+	<input type="submit" name="execute" value="Execute">
+	<input type="submit" name="calibrate" value="Calibrate">
+	</p>
+	</form>
 </body>
 </html>
-)";
+)rawliteral";
 
-const char* bodyExecute = R"(
+const char bodyExecute[] PROGMEM = R"rawliteral(
 <html>
 <head>
 <title>Ozone generator</title>
@@ -100,9 +120,9 @@ Execution<br>
 </form>
 </body>
 </html>
-)";
+)rawliteral";
 
-const char* bodyCalibrate = R"(
+const char bodyCalibrate[] PROGMEM = R"rawliteral(
 <html>
 <head>
 <title>Ozone generator</title>
@@ -115,86 +135,126 @@ Calibration<br>
 </form>
 </body>
 </html>
-)";
-
-char bodyStr[ 2048 ];
+)rawliteral";
 
 void
-prepareBodyMain( )
+sendBodyMain( AsyncWebServerRequest* request )
 {
-    sprintf( bodyStr, bodyMain, temperature, humidity, resistence, ozoneMgM3, r0, executionTime );
+    request->send_P( 200, "text/html", bodyMain, []( const String& var ) {
+        if ( var == "TEMPERATURE" )
+        {
+            return String( temperature );
+        }
+        else if ( var == "HUMIDITY" )
+        {
+            return String( humidity );
+        }
+        else if ( var == "CONCENTRATION" )
+        {
+            return String( ozoneMgM3 );
+        }
+        else if ( var == "RESISTENCE" )
+        {
+            return String( resistence );
+        }
+        else if ( var == "BASE_RESISTENCE" )
+        {
+            return String( r0 );
+        }
+        else if ( var == "EXECUTION_TIME" )
+        {
+            return String( executionTime );
+        }
+
+        return String( );
+    } );
 }
 
 void
-prepareBodyExecute( )
+sendBodyExecute( AsyncWebServerRequest* request )
 {
-    sprintf( bodyStr, bodyExecute );
+    request->send_P( 200, "text/html", bodyExecute, []( const String& var ) { return String( ); } );
 }
 
 void
-prepareBodyCalibrate( )
+sendBodyCalibrate( AsyncWebServerRequest* request )
 {
-    sprintf( bodyStr, bodyCalibrate );
+    request->send_P( 200, "text/html", bodyCalibrate,
+                     []( const String& var ) { return String( ); } );
 }
 
-/* Just a little test message.  Go to http://192.168.4.1 in a web browser
-   connected to this access point to see it.
-*/
 void
-handleRoot( )
+handleRoot( AsyncWebServerRequest* request )
 {
     switch ( mode )
     {
     case modeMain:
     {
-        if ( server.hasArg( "execute" ) )
+        if ( request->hasArg( "execute" ) )
         {
-            prepareBodyExecute( );
+            sendBodyExecute( request );
             mode = modeExecute;
         }
-        else if ( server.hasArg( "calibrate" ) )
+        else if ( request->hasArg( "calibrate" ) )
         {
-            prepareBodyCalibrate( );
+            sendBodyCalibrate( request );
             mode = modeCalibrate;
         }
         else
         {
-            prepareBodyMain( );
+            sendBodyMain( request );
         }
 
         break;
     }
     case modeExecute:
     {
-        if ( server.hasArg( "cancel" ) )
+        if ( request->hasArg( "cancel" ) )
         {
-            prepareBodyMain( );
+            sendBodyMain( request );
             mode = modeMain;
         }
         else
         {
-            prepareBodyExecute( );
+            sendBodyExecute( request );
         }
         break;
     }
     case modeCalibrate:
     {
-        if ( server.hasArg( "cancel" ) )
+        if ( request->hasArg( "cancel" ) )
         {
-            prepareBodyMain( );
+            sendBodyMain( request );
             mode = modeMain;
         }
         else
         {
-            prepareBodyCalibrate( );
+            sendBodyCalibrate( request );
         }
         break;
     }
     default:
+        request->send( 400, "text/plain", "Bad request" );
         break;
     }
+}
 
-    server.send( 200, "text/html", bodyStr );
+void
+setup( )
+{
+    delay( 1000 );
+    Serial.begin( 115200 );
+    dht.begin( );
+
+    WiFi.softAP( ssid, password );
+    IPAddress myIP = WiFi.softAPIP( );
+    Serial.print( "AP IP address: " );
+    Serial.println( myIP );
+
+    server.on( "/", HTTP_GET, handleRoot );
+
+    server.begin( );
+    Serial.println( "HTTP server started" );
 }
 
 void
@@ -207,8 +267,6 @@ measureDHT11( )
     }
     else
     {
-        Serial.print( "New value of temperature: " );
-        Serial.println( temperature );
         temperature = newT;
     }
 
@@ -219,8 +277,6 @@ measureDHT11( )
     }
     else
     {
-        Serial.print( "New value of humidity: " );
-        Serial.println( humidity );
         humidity = newH;
     }
 }
@@ -229,25 +285,6 @@ void
 handleSecond( )
 {
     measureDHT11( );
-}
-
-void
-setup( )
-{
-    delay( 1000 );
-    Serial.begin( 115200 );
-    dht.begin( );
-    Serial.println( );
-    Serial.print( "Configuring access point..." );
-    /* You can remove the password parameter if you want the AP to be open. */
-    WiFi.softAP( ssid, password );
-
-    IPAddress myIP = WiFi.softAPIP( );
-    Serial.print( "AP IP address: " );
-    Serial.println( myIP );
-    server.on( "/", handleRoot );
-    server.begin( );
-    Serial.println( "HTTP server started" );
 }
 
 void
@@ -260,6 +297,4 @@ loop( )
         handleSecond( );
         previous_ms = millis( );
     }
-
-    server.handleClient( );
 }
