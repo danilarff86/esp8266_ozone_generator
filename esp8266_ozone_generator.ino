@@ -11,8 +11,10 @@
 const char* ssid = "OzoneGenerator";
 const char* password = "80672807408";
 
-DHT dht( 2, DHT11 );
+DHT dht( 0, DHT11 );
 MQ131Sensor mq131( A0 );
+
+#define RELAY_PIN 2
 
 AsyncWebServer server( 80 );
 
@@ -434,6 +436,8 @@ setup( )
     delay( 1000 );
     Serial.begin( 115200 );
     dht.begin( );
+    pinMode( RELAY_PIN, OUTPUT );
+    digitalWrite( RELAY_PIN, HIGH );
 
     WiFi.softAP( ssid, password );
     IPAddress myIP = WiFi.softAPIP( );
@@ -491,7 +495,7 @@ activateGenerator( )
     execContext.secondsAfterModeChange = 0;
     execContext.activated = true;
     Serial.println( "Generator activated" );
-    // TODO: activate ozone generator
+    digitalWrite( RELAY_PIN, LOW );
 }
 
 inline void
@@ -500,7 +504,7 @@ deactivateGenerator( )
     execContext.secondsAfterModeChange = 0;
     execContext.activated = false;
     Serial.println( "Generator deactivated" );
-    // TODO: deactivate ozone generator
+    digitalWrite( RELAY_PIN, HIGH );
 }
 
 void
