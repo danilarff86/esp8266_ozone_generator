@@ -27,7 +27,16 @@ Mode mode = modeMain;
 
 float temperature = 0.0f;
 float humidity = 0.0f;
-int executionTime = 30;
+
+struct ExecutionContext
+{
+    int executionTime;
+    float expected_concentration;
+    uint32_t secondsPassed;
+    bool activated;
+    uint32_t secondsAfterModeChange;
+    static const uint8_t minModeSeconds = 10;
+} execContext{30, 30.0f};
 
 const char bodyMain[] PROGMEM = R"rawliteral(
 <!DOCTYPE HTML><html>
@@ -93,6 +102,11 @@ const char bodyMain[] PROGMEM = R"rawliteral(
 	<input type="text" name="r0" size="7" value="%BASE_RESISTENCE%">
 	<sup class="units">Ohms</sup>
 	</p>
+    <p>
+	<span class="dht-labels">Expected concentration</span>
+	<input type="text" name="expected_concentration" size="5" value="%EXPECTED_CONCENTRATION%">
+	<sup class="units">mg/m3</sup>
+	</p>
 	<p>
 	<span class="dht-labels">Execution time</span>
 	<input type="text" name="t_exec" size="3" value="%EXECUTION_TIME%">
@@ -108,16 +122,88 @@ const char bodyMain[] PROGMEM = R"rawliteral(
 )rawliteral";
 
 const char bodyExecute[] PROGMEM = R"rawliteral(
-<html>
+<!DOCTYPE HTML><html>
 <head>
-<title>Ozone generator</title>
-<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<style>
+	html {
+		font-family: Arial;
+		display: inline-block;
+		margin: 0px auto;
+		text-align: center;
+	}
+	h2 { font-size: 3.0rem; }
+	p { font-size: 1.5rem; }
+	.units { font-size: 1.2rem; }
+	.dht-labels{
+		font-size: 1.5rem;
+		vertical-align:middle;
+		padding-bottom: 15px;
+	}
+	input[type=button], input[type=submit], input[type=reset] {
+		background-color: #808080;
+		font-size: 1.5rem;
+		border: none;
+		padding: 16px 32px;
+		text-decoration: none;
+		margin: 4px 2px;
+		cursor: pointer;
+	}
+	input[type=text] {
+		font-size: 1.5rem;
+		border: none;
+		text-align: center;
+		border-bottom: 2px solid grey;
+	}
+	</style>
 </head>
 <body>
-<form action="/" method="post">
-Execution<br>
-<input type="submit" name="cancel" value="Cancel">
-</form>
+	<h2>Ozone generator execution</h2>
+	<form action="/" method="post">
+	<p>
+	<span class="dht-labels">Temperature</span> 
+	<span id="temperature">%TEMPERATURE%</span>
+	<sup class="units">&deg;C</sup>
+	</p>
+	<p>
+	<span class="dht-labels">Humidity</span>
+	<span id="humidity">%HUMIDITY%</span>
+	<sup class="units">&#37;</sup>
+	</p>
+	<p>
+	<span class="dht-labels">Concentration</span>
+	<span id="concentration">%CONCENTRATION%</span>
+	<sup class="units">mg/m3</sup>
+	</p>
+	<p>
+	<span class="dht-labels">Resistence</span>
+	<span id="resistence">%RESISTENCE%</span>
+	<sup class="units">Ohms</sup>
+	</p>
+	<p>
+	<span class="dht-labels">Base resistence</span>
+    <span id="r0">%BASE_RESISTENCE%</span>
+	<sup class="units">Ohms</sup>
+	</p>
+    <p>
+	<span class="dht-labels">Expected concentration</span>
+    <span id="expected_concentration">%EXPECTED_CONCENTRATION%</span>
+	<sup class="units">mg/m3</sup>
+	</p>
+	<p>
+	<span class="dht-labels">Execution time</span>
+    <span id="t_exec">%EXECUTION_TIME%</span>
+	<sup class="units">minutes</sup>
+	</p>
+    <p>
+	<span class="dht-labels">Time passed</span>
+    <span id="t_passed">%TIME_PASSED%</span>
+	<sup class="units">minutes</sup>
+	</p>
+	<p>
+	<input type="submit" name="cancel" value="Cancel">
+	</p>
+	</form>
 </body>
 </html>
 )rawliteral";
@@ -200,7 +286,11 @@ sendBodyMain( AsyncWebServerRequest* request )
         }
         else if ( var == "EXECUTION_TIME" )
         {
-            return String( executionTime );
+            return String( execContext.executionTime );
+        }
+        else if ( var == "EXPECTED_CONCENTRATION" )
+        {
+            return String( execContext.expected_concentration );
         }
 
         return String( );
@@ -210,7 +300,42 @@ sendBodyMain( AsyncWebServerRequest* request )
 void
 sendBodyExecute( AsyncWebServerRequest* request )
 {
-    request->send_P( 200, "text/html", bodyExecute, []( const String& var ) { return String( ); } );
+    request->send_P( 200, "text/html", bodyExecute, []( const String& var ) {
+        if ( var == "TEMPERATURE" )
+        {
+            return String( temperature );
+        }
+        else if ( var == "HUMIDITY" )
+        {
+            return String( humidity );
+        }
+        else if ( var == "CONCENTRATION" )
+        {
+            return String( mq131.get_o3( MQ131Sensor::Unit::MG_M3, {temperature, humidity} ) );
+        }
+        else if ( var == "RESISTENCE" )
+        {
+            return String( mq131.get_r_sensor( ) );
+        }
+        else if ( var == "BASE_RESISTENCE" )
+        {
+            return String( mq131.get_r0_sensor( ) );
+        }
+        else if ( var == "EXECUTION_TIME" )
+        {
+            return String( execContext.executionTime );
+        }
+        else if ( var == "EXPECTED_CONCENTRATION" )
+        {
+            return String( execContext.expected_concentration );
+        }
+        else if ( var == "TIME_PASSED" )
+        {
+            return String( execContext.secondsPassed / 60 );
+        }
+
+        return String( );
+    } );
 }
 
 void
@@ -235,9 +360,27 @@ handleRoot( AsyncWebServerRequest* request )
     {
         if ( request->method( ) == HTTP_POST )
         {
+            if ( request->hasParam( "r0", true ) )
+            {
+                const auto r0 = request->getParam( "r0", true )->value( ).toFloat( );
+                mq131.set_r0_sensor( r0 );
+            }
+
+            if ( request->hasParam( "t_exec", true ) )
+            {
+                execContext.executionTime = request->getParam( "t_exec", true )->value( ).toInt( );
+            }
+
+            if ( request->hasParam( "expected_concentration", true ) )
+            {
+                execContext.expected_concentration
+                    = request->getParam( "expected_concentration", true )->value( ).toFloat( );
+            }
+
             if ( request->hasParam( "execute", true ) )
             {
                 sendBodyExecute( request );
+                startExecution( );
                 mode = modeExecute;
                 break;
             }
@@ -259,6 +402,7 @@ handleRoot( AsyncWebServerRequest* request )
         {
             sendBodyMain( request );
             mode = modeMain;
+            stopExecution( );
             break;
         }
 
@@ -341,12 +485,81 @@ handleCalibration( )
     }
 }
 
+inline void
+activateGenerator( )
+{
+    execContext.secondsAfterModeChange = 0;
+    execContext.activated = true;
+    Serial.println( "Generator activated" );
+    // TODO: activate ozone generator
+}
+
+inline void
+deactivateGenerator( )
+{
+    execContext.secondsAfterModeChange = 0;
+    execContext.activated = false;
+    Serial.println( "Generator deactivated" );
+    // TODO: deactivate ozone generator
+}
+
+void
+startExecution( )
+{
+    deactivateGenerator( );
+    execContext.secondsAfterModeChange = execContext.minModeSeconds;
+    execContext.secondsPassed = 0;
+    Serial.println( "Execution started" );
+}
+
+void
+stopExecution( )
+{
+    deactivateGenerator( );
+    Serial.println( "Execution stopped" );
+}
+
+void
+handleExecution( )
+{
+    if ( execContext.secondsPassed >= ( execContext.executionTime * 60 ) )
+    {
+        stopExecution( );
+        mode = modeMain;
+    }
+    else
+    {
+        const auto concentration
+            = mq131.get_o3( MQ131Sensor::Unit::MG_M3, {temperature, humidity} );
+
+        if ( ( concentration < ( execContext.expected_concentration * 0.9 ) )
+             && ( execContext.secondsAfterModeChange >= execContext.minModeSeconds )
+             && !execContext.activated )
+        {
+            activateGenerator( );
+        }
+        else if ( ( concentration > ( execContext.expected_concentration * 1.1 ) )
+                  && ( execContext.secondsAfterModeChange >= execContext.minModeSeconds )
+                  && execContext.activated )
+        {
+            deactivateGenerator( );
+        }
+    }
+    ++execContext.secondsPassed;
+    ++execContext.secondsAfterModeChange;
+}
+
 void
 handleSecond( )
 {
     measureDHT11( );
 
     mq131.sample( );
+
+    if ( mode == modeExecute )
+    {
+        handleExecution( );
+    }
 
     if ( mode == modeCalibrate )
     {
