@@ -6,10 +6,13 @@
 #include <ESPAsyncWebServer.h>
 #include <Hash.h>
 
+#include "MQ131Sensor.h"
+
 const char* ssid = "OzoneGenerator";
 const char* password = "80672807408";
 
-DHT dht( D4, DHT11 );
+DHT dht( 2, DHT11 );
+MQ131Sensor mq131( A0 );
 
 AsyncWebServer server( 80 );
 
@@ -24,9 +27,6 @@ Mode mode = modeMain;
 
 float temperature = 0.0f;
 float humidity = 0.0f;
-float resistence = 12100.3f;
-float r0 = 11000.1f;
-float ozoneMgM3 = 13.5f;
 int executionTime = 30;
 
 const char bodyMain[] PROGMEM = R"rawliteral(
@@ -151,15 +151,15 @@ sendBodyMain( AsyncWebServerRequest* request )
         }
         else if ( var == "CONCENTRATION" )
         {
-            return String( ozoneMgM3 );
+            return String( mq131.get_o3( MQ131Sensor::Unit::MG_M3, {temperature, humidity} ) );
         }
         else if ( var == "RESISTENCE" )
         {
-            return String( resistence );
+            return String( mq131.get_r_sensor( ) );
         }
         else if ( var == "BASE_RESISTENCE" )
         {
-            return String( r0 );
+            return String( mq131.get_r0_sensor( ) );
         }
         else if ( var == "EXECUTION_TIME" )
         {
@@ -285,6 +285,8 @@ void
 handleSecond( )
 {
     measureDHT11( );
+
+    mq131.sample( );
 }
 
 void
