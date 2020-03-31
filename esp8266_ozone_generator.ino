@@ -6,6 +6,7 @@
 #include <ESPAsyncWebServer.h>
 #include <Hash.h>
 
+#include "ESP_EEPROM.h"
 #include "MQ131Sensor.h"
 
 const char* ssid = "OzoneGenerator";
@@ -33,12 +34,20 @@ float humidity = 0.0f;
 struct ExecutionContext
 {
     int executionTime;
-    float expected_concentration;
+    float expectedConcentration;
     uint32_t secondsPassed;
     bool activated;
     uint32_t secondsAfterModeChange;
     static const uint8_t minModeSeconds = 10;
 } execContext{30, 30.0f};
+
+enum EEPROM_OFFSET
+{
+    EEPROM_OFFSET_EXEC_TIME = 0,
+    EEPROM_OFFSET_R0 = EEPROM_OFFSET_EXEC_TIME + sizeof( int ),
+    EEPROM_OFFSET_EXPECTED_CONCENTRATION = EEPROM_OFFSET_R0 + sizeof( float ),
+    EEPROM_OFFSET_LAST = EEPROM_OFFSET_EXPECTED_CONCENTRATION + sizeof( float )
+};
 
 const char bodyMain[] PROGMEM = R"rawliteral(
 <!DOCTYPE HTML><html>
@@ -292,7 +301,7 @@ sendBodyMain( AsyncWebServerRequest* request )
         }
         else if ( var == "EXPECTED_CONCENTRATION" )
         {
-            return String( execContext.expected_concentration );
+            return String( execContext.expectedConcentration );
         }
 
         return String( );
@@ -329,7 +338,7 @@ sendBodyExecute( AsyncWebServerRequest* request )
         }
         else if ( var == "EXPECTED_CONCENTRATION" )
         {
-            return String( execContext.expected_concentration );
+            return String( execContext.expectedConcentration );
         }
         else if ( var == "TIME_PASSED" )
         {
@@ -354,6 +363,26 @@ sendBodyCalibrate( AsyncWebServerRequest* request )
 }
 
 void
+loadEEPROMData( )
+{
+    EEPROM.get( EEPROM_OFFSET_EXEC_TIME, execContext.executionTime );
+    float tmpR0;
+    EEPROM.get( EEPROM_OFFSET_R0, tmpR0 );
+    mq131.set_r0_sensor( tmpR0 );
+    EEPROM.get( EEPROM_OFFSET_EXPECTED_CONCENTRATION, execContext.expectedConcentration );
+}
+
+void
+saveEEPROMData( )
+{
+    EEPROM.put( EEPROM_OFFSET_EXEC_TIME, execContext.executionTime );
+    EEPROM.put( EEPROM_OFFSET_R0, mq131.get_r0_sensor( ) );
+    EEPROM.put( EEPROM_OFFSET_EXPECTED_CONCENTRATION, execContext.expectedConcentration );
+    boolean ok = EEPROM.commit( );
+    Serial.println( ( ok ) ? "EEPROM commit OK" : "EEPROM commit FAILED" );
+}
+
+void
 handleRoot( AsyncWebServerRequest* request )
 {
     switch ( mode )
@@ -362,21 +391,42 @@ handleRoot( AsyncWebServerRequest* request )
     {
         if ( request->method( ) == HTTP_POST )
         {
+            bool eeprom_changed = false;
             if ( request->hasParam( "r0", true ) )
             {
-                const auto r0 = request->getParam( "r0", true )->value( ).toFloat( );
-                mq131.set_r0_sensor( r0 );
+                const auto newR0 = request->getParam( "r0", true )->value( ).toFloat( );
+                if ( newR0 != mq131.get_r0_sensor( ) )
+                {
+                    mq131.set_r0_sensor( newR0 );
+                    eeprom_changed = true;
+                }
             }
 
             if ( request->hasParam( "t_exec", true ) )
             {
-                execContext.executionTime = request->getParam( "t_exec", true )->value( ).toInt( );
+                const auto newExecutionTime
+                    = request->getParam( "t_exec", true )->value( ).toInt( );
+                if ( newExecutionTime != execContext.executionTime )
+                {
+                    execContext.executionTime = newExecutionTime;
+                    eeprom_changed = true;
+                }
             }
 
             if ( request->hasParam( "expected_concentration", true ) )
             {
-                execContext.expected_concentration
+                const auto newExpectedConcentration
                     = request->getParam( "expected_concentration", true )->value( ).toFloat( );
+                if ( newExpectedConcentration != execContext.expectedConcentration )
+                {
+                    execContext.expectedConcentration = newExpectedConcentration;
+                    eeprom_changed = true;
+                }
+            }
+
+            if ( eeprom_changed )
+            {
+                saveEEPROMData( );
             }
 
             if ( request->hasParam( "execute", true ) )
@@ -435,10 +485,16 @@ setup( )
 {
     delay( 1000 );
     Serial.begin( 115200 );
+    Serial.println( );
+
     dht.begin( );
     pinMode( RELAY_PIN, OUTPUT );
     digitalWrite( RELAY_PIN, HIGH );
 
+    EEPROM.begin( EEPROM_OFFSET_LAST );
+    loadEEPROMData( );
+
+    Serial.println( "Configuring access point..." );
     WiFi.softAP( ssid, password );
     IPAddress myIP = WiFi.softAPIP( );
     Serial.print( "AP IP address: " );
@@ -481,6 +537,7 @@ handleCalibration( )
     if ( mq131.is_calibration_finished( ) )
     {
         mq131.apply_calibration_data( );
+        saveEEPROMData( );
         mode = modeMain;
     }
     else
@@ -536,13 +593,13 @@ handleExecution( )
         const auto concentration
             = mq131.get_o3( MQ131Sensor::Unit::MG_M3, {temperature, humidity} );
 
-        if ( ( concentration < ( execContext.expected_concentration * 0.9 ) )
+        if ( ( concentration < ( execContext.expectedConcentration * 0.9 ) )
              && ( execContext.secondsAfterModeChange >= execContext.minModeSeconds )
              && !execContext.activated )
         {
             activateGenerator( );
         }
-        else if ( ( concentration > ( execContext.expected_concentration * 1.1 ) )
+        else if ( ( concentration > ( execContext.expectedConcentration * 1.1 ) )
                   && ( execContext.secondsAfterModeChange >= execContext.minModeSeconds )
                   && execContext.activated )
         {
