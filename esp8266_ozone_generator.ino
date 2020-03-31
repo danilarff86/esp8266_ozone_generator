@@ -12,10 +12,10 @@
 const char* ssid = "OzoneGenerator";
 const char* password = "80672807408";
 
-DHT dht( 0, DHT11 );
+DHT dht( D4, DHT11 );
 MQ131Sensor mq131( A0 );
 
-#define RELAY_PIN 2
+#define RELAY_PIN D3
 
 AsyncWebServer server( 80 );
 
@@ -103,6 +103,11 @@ const char bodyMain[] PROGMEM = R"rawliteral(
 	<span id="concentration">%CONCENTRATION%</span>
 	<sup class="units">mg/m3</sup>
 	</p>
+    <p>
+	<span class="dht-labels">ADC data</span>
+	<span id="adc_data">%ADC_DATA%</span>
+	<sup class="units">1/1024</sup>
+	</p>
 	<p>
 	<span class="dht-labels">Resistence</span>
 	<span id="resistence">%RESISTENCE%</span>
@@ -185,6 +190,11 @@ const char bodyExecute[] PROGMEM = R"rawliteral(
 	<span class="dht-labels">Concentration</span>
 	<span id="concentration">%CONCENTRATION%</span>
 	<sup class="units">mg/m3</sup>
+	</p>
+    <p>
+	<span class="dht-labels">ADC data</span>
+	<span id="adc_data">%ADC_DATA%</span>
+	<sup class="units">1/1024</sup>
 	</p>
 	<p>
 	<span class="dht-labels">Resistence</span>
@@ -287,6 +297,10 @@ sendBodyMain( AsyncWebServerRequest* request )
         {
             return String( mq131.get_o3( MQ131Sensor::Unit::MG_M3, {temperature, humidity} ) );
         }
+        else if ( var == "ADC_DATA" )
+        {
+            return String( mq131.get_adc_data( ) );
+        }
         else if ( var == "RESISTENCE" )
         {
             return String( mq131.get_r_sensor( ) );
@@ -323,6 +337,10 @@ sendBodyExecute( AsyncWebServerRequest* request )
         else if ( var == "CONCENTRATION" )
         {
             return String( mq131.get_o3( MQ131Sensor::Unit::MG_M3, {temperature, humidity} ) );
+        }
+        else if ( var == "ADC_DATA" )
+        {
+            return String( mq131.get_adc_data( ) );
         }
         else if ( var == "RESISTENCE" )
         {
