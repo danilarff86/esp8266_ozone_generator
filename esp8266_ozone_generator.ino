@@ -129,7 +129,8 @@ const char bodyMain[] PROGMEM = R"rawliteral(
 	<sup class="units">minutes</sup>
 	</p>
 	<p>
-	<input type="submit" name="execute" value="Execute">
+    <input type="submit" name="refresh" value="Refresh"><br/>
+	<input type="submit" name="execute" value="Execute"><br/>
 	<input type="submit" name="calibrate" value="Calibrate">
 	</p>
 	</form>
@@ -222,6 +223,7 @@ const char bodyExecute[] PROGMEM = R"rawliteral(
 	<sup class="units">minutes</sup>
 	</p>
 	<p>
+    <input type="submit" name="refresh" value="Refresh"><br/>
 	<input type="submit" name="cancel" value="Cancel">
 	</p>
 	</form>
@@ -274,6 +276,7 @@ const char bodyCalibrate[] PROGMEM = R"rawliteral(
 	<sup class="units">Ohms</sup>
 	</p>
 	<p>
+    <input type="submit" name="refresh" value="Refresh"><br/>
 	<input type="submit" name="cancel" value="Cancel">
 	</p>
 	</form>
