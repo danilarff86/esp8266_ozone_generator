@@ -67,7 +67,7 @@ const char headStr[] PROGMEM = R"rawliteral(
 		vertical-align:middle;
 		padding-bottom: 15px;
 	}
-	input[type=button], input[type=submit], input[type=reset] {
+	button, input[type=button], input[type=submit], input[type=reset] {
 		background-color: #808080;
 		font-size: 1.5rem;
 		border: none;
@@ -91,6 +91,7 @@ const char bodyMain[] PROGMEM = R"rawliteral(
 %HEAD%
 <body>
 	<h2>Ozone generator</h2>
+    <button onClick="window.location.href=window.location.href">Refresh Page</button>
 	<form action="/" method="post">
 	<p>
 	<span class="dht-labels">Temperature</span> 
@@ -146,6 +147,7 @@ const char bodyExecute[] PROGMEM = R"rawliteral(
 %HEAD%
 <body>
 	<h2>Ozone generator execution</h2>
+    <button onClick="window.location.href=window.location.href">Refresh Page</button>
 	<form action="/" method="post">
 	<p>
 	<span class="dht-labels">Temperature</span> 
@@ -205,6 +207,7 @@ const char bodyCalibrate[] PROGMEM = R"rawliteral(
 %HEAD%
 <body>
 	<h2>Ozone generator calibration</h2>
+    <button onClick="window.location.href=window.location.href">Refresh Page</button>
 	<form action="/" method="post">
 	<p>
 	<span class="dht-labels">ADC data</span>
