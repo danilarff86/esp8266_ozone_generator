@@ -49,8 +49,7 @@ enum EEPROM_OFFSET
     EEPROM_OFFSET_LAST = EEPROM_OFFSET_EXPECTED_CONCENTRATION + sizeof( float )
 };
 
-const char bodyMain[] PROGMEM = R"rawliteral(
-<!DOCTYPE HTML><html>
+const char headStr[] PROGMEM = R"rawliteral(
 <head>
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<style>
@@ -85,6 +84,11 @@ const char bodyMain[] PROGMEM = R"rawliteral(
 	}
 	</style>
 </head>
+)rawliteral";
+
+const char bodyMain[] PROGMEM = R"rawliteral(
+<!DOCTYPE HTML><html>
+%HEAD%
 <body>
 	<h2>Ozone generator</h2>
 	<form action="/" method="post">
@@ -103,7 +107,7 @@ const char bodyMain[] PROGMEM = R"rawliteral(
 	<span id="concentration">%CONCENTRATION%</span>
 	<sup class="units">mg/m3</sup>
 	</p>
-    <p>
+	<p>
 	<span class="dht-labels">ADC data</span>
 	<span id="adc_data">%ADC_DATA%</span>
 	<sup class="units">1/1024</sup>
@@ -118,7 +122,7 @@ const char bodyMain[] PROGMEM = R"rawliteral(
 	<input type="text" name="r0" size="7" value="%BASE_RESISTENCE%">
 	<sup class="units">Ohms</sup>
 	</p>
-    <p>
+	<p>
 	<span class="dht-labels">Expected concentration</span>
 	<input type="text" name="expected_concentration" size="5" value="%EXPECTED_CONCENTRATION%">
 	<sup class="units">mg/m3</sup>
@@ -129,7 +133,6 @@ const char bodyMain[] PROGMEM = R"rawliteral(
 	<sup class="units">minutes</sup>
 	</p>
 	<p>
-    <input type="submit" name="refresh" value="Refresh"><br/>
 	<input type="submit" name="execute" value="Execute"><br/>
 	<input type="submit" name="calibrate" value="Calibrate">
 	</p>
@@ -140,40 +143,7 @@ const char bodyMain[] PROGMEM = R"rawliteral(
 
 const char bodyExecute[] PROGMEM = R"rawliteral(
 <!DOCTYPE HTML><html>
-<head>
-	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<style>
-	html {
-		font-family: Arial;
-		display: inline-block;
-		margin: 0px auto;
-		text-align: center;
-	}
-	h2 { font-size: 3.0rem; }
-	p { font-size: 1.5rem; }
-	.units { font-size: 1.2rem; }
-	.dht-labels{
-		font-size: 1.5rem;
-		vertical-align:middle;
-		padding-bottom: 15px;
-	}
-	input[type=button], input[type=submit], input[type=reset] {
-		background-color: #808080;
-		font-size: 1.5rem;
-		border: none;
-		padding: 16px 32px;
-		text-decoration: none;
-		margin: 4px 2px;
-		cursor: pointer;
-	}
-	input[type=text] {
-		font-size: 1.5rem;
-		border: none;
-		text-align: center;
-		border-bottom: 2px solid grey;
-	}
-	</style>
-</head>
+%HEAD%
 <body>
 	<h2>Ozone generator execution</h2>
 	<form action="/" method="post">
@@ -192,7 +162,7 @@ const char bodyExecute[] PROGMEM = R"rawliteral(
 	<span id="concentration">%CONCENTRATION%</span>
 	<sup class="units">mg/m3</sup>
 	</p>
-    <p>
+	<p>
 	<span class="dht-labels">ADC data</span>
 	<span id="adc_data">%ADC_DATA%</span>
 	<sup class="units">1/1024</sup>
@@ -204,26 +174,25 @@ const char bodyExecute[] PROGMEM = R"rawliteral(
 	</p>
 	<p>
 	<span class="dht-labels">Base resistence</span>
-    <span id="r0">%BASE_RESISTENCE%</span>
+	<span id="r0">%BASE_RESISTENCE%</span>
 	<sup class="units">Ohms</sup>
 	</p>
-    <p>
+	<p>
 	<span class="dht-labels">Expected concentration</span>
-    <span id="expected_concentration">%EXPECTED_CONCENTRATION%</span>
+	<span id="expected_concentration">%EXPECTED_CONCENTRATION%</span>
 	<sup class="units">mg/m3</sup>
 	</p>
 	<p>
 	<span class="dht-labels">Execution time</span>
-    <span id="t_exec">%EXECUTION_TIME%</span>
-	<sup class="units">minutes</sup>
-	</p>
-    <p>
-	<span class="dht-labels">Time passed</span>
-    <span id="t_passed">%TIME_PASSED%</span>
+	<span id="t_exec">%EXECUTION_TIME%</span>
 	<sup class="units">minutes</sup>
 	</p>
 	<p>
-    <input type="submit" name="refresh" value="Refresh"><br/>
+	<span class="dht-labels">Time passed</span>
+	<span id="t_passed">%TIME_PASSED%</span>
+	<sup class="units">minutes</sup>
+	</p>
+	<p>
 	<input type="submit" name="cancel" value="Cancel">
 	</p>
 	</form>
@@ -233,50 +202,21 @@ const char bodyExecute[] PROGMEM = R"rawliteral(
 
 const char bodyCalibrate[] PROGMEM = R"rawliteral(
 <!DOCTYPE HTML><html>
-<head>
-	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<style>
-	html {
-		font-family: Arial;
-		display: inline-block;
-		margin: 0px auto;
-		text-align: center;
-	}
-	h2 { font-size: 3.0rem; }
-	p { font-size: 1.5rem; }
-	.units { font-size: 1.2rem; }
-	.dht-labels{
-		font-size: 1.5rem;
-		vertical-align:middle;
-		padding-bottom: 15px;
-	}
-	input[type=button], input[type=submit], input[type=reset] {
-		background-color: #808080;
-		font-size: 1.5rem;
-		border: none;
-		padding: 16px 32px;
-		text-decoration: none;
-		margin: 4px 2px;
-		cursor: pointer;
-	}
-	input[type=text] {
-		font-size: 1.5rem;
-		border: none;
-		text-align: center;
-		border-bottom: 2px solid grey;
-	}
-	</style>
-</head>
+%HEAD%
 <body>
 	<h2>Ozone generator calibration</h2>
 	<form action="/" method="post">
+	<p>
+	<span class="dht-labels">ADC data</span>
+	<span id="adc_data">%ADC_DATA%</span>
+	<sup class="units">1/1024</sup>
+	</p>
 	<p>
 	<span class="dht-labels">Resistence</span>
 	<span id="resistence">%RESISTENCE%</span>
 	<sup class="units">Ohms</sup>
 	</p>
 	<p>
-    <input type="submit" name="refresh" value="Refresh"><br/>
 	<input type="submit" name="cancel" value="Cancel">
 	</p>
 	</form>
@@ -285,51 +225,14 @@ const char bodyCalibrate[] PROGMEM = R"rawliteral(
 )rawliteral";
 
 void
-sendBodyMain( AsyncWebServerRequest* request )
+sendBody( AsyncWebServerRequest* request, const char* body )
 {
-    request->send_P( 200, "text/html", bodyMain, []( const String& var ) {
-        if ( var == "TEMPERATURE" )
+    request->send_P( 200, "text/html", body, []( const String& var ) {
+        if ( var == "HEAD" )
         {
-            return String( temperature );
+            return String( headStr );
         }
-        else if ( var == "HUMIDITY" )
-        {
-            return String( humidity );
-        }
-        else if ( var == "CONCENTRATION" )
-        {
-            return String( mq131.get_o3( MQ131Sensor::Unit::MG_M3, {temperature, humidity} ) );
-        }
-        else if ( var == "ADC_DATA" )
-        {
-            return String( mq131.get_adc_data( ) );
-        }
-        else if ( var == "RESISTENCE" )
-        {
-            return String( mq131.get_r_sensor( ) );
-        }
-        else if ( var == "BASE_RESISTENCE" )
-        {
-            return String( mq131.get_r0_sensor( ) );
-        }
-        else if ( var == "EXECUTION_TIME" )
-        {
-            return String( execContext.executionTime );
-        }
-        else if ( var == "EXPECTED_CONCENTRATION" )
-        {
-            return String( execContext.expectedConcentration );
-        }
-
-        return String( );
-    } );
-}
-
-void
-sendBodyExecute( AsyncWebServerRequest* request )
-{
-    request->send_P( 200, "text/html", bodyExecute, []( const String& var ) {
-        if ( var == "TEMPERATURE" )
+        else if ( var == "TEMPERATURE" )
         {
             return String( temperature );
         }
@@ -364,19 +267,6 @@ sendBodyExecute( AsyncWebServerRequest* request )
         else if ( var == "TIME_PASSED" )
         {
             return String( execContext.secondsPassed / 60 );
-        }
-
-        return String( );
-    } );
-}
-
-void
-sendBodyCalibrate( AsyncWebServerRequest* request )
-{
-    request->send_P( 200, "text/html", bodyCalibrate, []( const String& var ) {
-        if ( var == "RESISTENCE" )
-        {
-            return String( mq131.get_r_sensor( ) );
         }
 
         return String( );
@@ -452,47 +342,47 @@ handleRoot( AsyncWebServerRequest* request )
 
             if ( request->hasParam( "execute", true ) )
             {
-                sendBodyExecute( request );
+                sendBody( request, bodyExecute );
                 startExecution( );
                 mode = modeExecute;
                 break;
             }
             else if ( request->hasParam( "calibrate", true ) )
             {
-                sendBodyCalibrate( request );
+                sendBody( request, bodyCalibrate );
                 mq131.start_calibration( );
                 mode = modeCalibrate;
                 break;
             }
         }
 
-        sendBodyMain( request );
+        sendBody( request, bodyMain );
         break;
     }
     case modeExecute:
     {
         if ( request->method( ) == HTTP_POST && request->hasParam( "cancel", true ) )
         {
-            sendBodyMain( request );
+            sendBody( request, bodyMain );
             mode = modeMain;
             stopExecution( );
             break;
         }
 
-        sendBodyExecute( request );
+        sendBody( request, bodyExecute );
         break;
     }
     case modeCalibrate:
     {
         if ( request->method( ) == HTTP_POST && request->hasParam( "cancel", true ) )
         {
-            sendBodyMain( request );
+            sendBody( request, bodyMain );
             mode = modeMain;
             mq131.cancel_calibration( );
             break;
         }
 
-        sendBodyCalibrate( request );
+        sendBody( request, bodyCalibrate );
         break;
     }
     default:
