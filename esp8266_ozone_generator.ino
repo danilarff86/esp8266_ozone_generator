@@ -9,8 +9,8 @@
 #include "ESP_EEPROM.h"
 #include "MQ131Sensor.h"
 
-const char* ssid = "OzoneGenerator";
-const char* password = "80672807408";
+const char* ssid = "Danila_legacy";
+const char* password = "victory@2021";
 
 DHT dht( D4, DHT11 );
 MQ131Sensor mq131( A0 );
@@ -408,11 +408,33 @@ setup( )
     EEPROM.begin( EEPROM_OFFSET_LAST );
     loadEEPROMData( );
 
-    Serial.println( "Configuring access point..." );
-    WiFi.softAP( ssid, password );
-    IPAddress myIP = WiFi.softAPIP( );
-    Serial.print( "AP IP address: " );
-    Serial.println( myIP );
+    // Serial.println( "Configuring access point..." );
+    // WiFi.softAP( ssid, password );
+    // IPAddress myIP = WiFi.softAPIP( );
+    // Serial.print( "AP IP address: " );
+    // Serial.println( myIP );
+
+    Serial.println( );
+    Serial.println( );
+    Serial.print( "Connecting to " );
+    Serial.println( ssid );
+
+    /* Explicitly set the ESP8266 to be a WiFi-client, otherwise, it by default,
+       would try to act as both a client and an access-point and could cause
+       network-issues with your other WiFi-devices on your WiFi-network. */
+    WiFi.mode( WIFI_STA );
+    WiFi.begin( ssid, password );
+
+    while ( WiFi.status( ) != WL_CONNECTED )
+    {
+        delay( 500 );
+        Serial.print( "." );
+    }
+
+    Serial.println( "" );
+    Serial.println( "WiFi connected" );
+    Serial.println( "IP address: " );
+    Serial.println( WiFi.localIP( ) );
 
     server.on( "/", HTTP_GET, handleRoot );
     server.on( "/", HTTP_POST, handleRoot );
